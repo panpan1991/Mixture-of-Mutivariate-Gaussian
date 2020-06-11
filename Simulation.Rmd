@@ -1,21 +1,39 @@
+---
+title: "Summary of Mohamad Khaled"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
 library("ggplot2")
 library("mixtools")
 library("mvtnorm")
-source(file="filename.r")
+```
 
-#t-copula with df=2
+## T-copula with df=2
+
+```{r}
 sigma=matrix(c(1, 0.75, 0.75, 1), ncol=2)
-data=rmvt(1000, sigma, df=2)
-copula=data.frame(pt(data, df=2))
-colnames(copula)=c('U', 'V')
+dataT=rmvt(1000, sigma, df=2)
 
-ggplot(copula)+
+copulaT=data.frame(pt(dataT, df=2))
+colnames(copulaT)=c('U', 'V')
+
+dataT=data.frame(dataT)
+ggplot(dataT)+
+  geom_point(aes(x=X1, y=X2),color='blue')+
+  ggtitle("A Sample from T Distribution with df=2")
+
+ggplot(copulaT)+
   geom_point(aes(x=U, y=V),color='blue')+
   ggtitle("A Sample from T copula with df=2")
 
-data=qnorm(pt(data, df=2))
 
-######################################################
+```
+## The Copula Example in Mohamad Khaled 2018
+
+This copula is neighter radially symmetric nor exchangeable.
+
+```{r}
 R=6
 mu=c(-9, -5.4, -1.8, 1.8, 5.4, 9)
 sigmar=rep(1/sqrt(10), R)
@@ -23,6 +41,10 @@ pi=rep(1/R, R)
 alpha=3/4
 beta=1/2
 theta=20
+```
+
+
+```{r }
 
 # evaluate the function at the point x, where the components 
 # of the mixture have weights w, means stored in u, and std deviations
@@ -36,20 +58,10 @@ F_inv = function(p,w,u,s,br=c(-1000,1000))
   return( uniroot(G,br)$root ) 
 }
 
-#test the inverse function above
-X = c(rnorm(1000,mean=-9,sd=1/sqrt(10)),
-      rnorm(1000,mean=-5.4,sd=1/sqrt(10)),
-      rnorm(1000,mean=-1.8,sd=1/sqrt(10)),
-      rnorm(1000,mean=1.8,sd=1/sqrt(10)),
-      rnorm(1000,mean=5.4,sd=1/sqrt(10)),
-      rnorm(1000,mean=9,sd=1/sqrt(10)))
+```
 
-#Sample quantile
-quantile(X,.95)
 
-#Quantile from F_inv
-F_inv(.95,pi ,mu, sigmar)
-
+```{r}
 V=runif(1000)
 W=runif(1000)
 
@@ -67,52 +79,54 @@ for (i in 1:1000) {
 
 X1=sapply(V, F_inv, w=pi, u=mu, s=sigmar)
 X2=sapply(U, F_inv, w=pi, u=mu, s=sigmar)
-
+X=data.frame(X1, X2)
 
 copula=data.frame(V, U)
 # write.csv(data, "UV.csv", row.names = FALSE)
 
+
+
+```
+
+## EM algorithm to estimate a mixture of multivariate normal distributions
+
+```{r}
 Z=qnorm(U);
 W=qnorm(V);
-data=data.frame(Z, W)
-# plot(Z,W)
-# write.csv(data, "ZW.csv", row.names = FALSE)
+dataZ=data.frame(Z, W)
 
-
-
-#########################################################################
-# EM algorithm to estimate a mixture of multivariate normal distributions
-est=mvnormalmixEM(data, lambda = NULL, mu = NULL, sigma = NULL, k = 3,
+est=mvnormalmixEM(dataZ, lambda = NULL, mu = NULL, sigma = NULL, k = 3,
               arbmean = TRUE, arbvar = TRUE, epsilon = 1e-08, 
               maxit = 10000, verb = FALSE)
 
-#########################################################################
-#Sampling from the posterior predictive distribution
+
+```
+
+##Sampling from the posterior predictive distribution
+
+```{r}
 x.1<-rmvnorm(round(est$lambda[1],2)*1000, est$mu[[1]], est$sigma[[1]])
 x.2 <- rmvnorm(round(est$lambda[2],2)*1000, est$mu[[2]], est$sigma[[2]])
 x.3 <-rmvnorm(round(est$lambda[3],2)*1000, est$mu[[3]], est$sigma[[3]])
 
-X.1 <- rbind(x.1, x.2, x.3)
-pred=data.frame(X.1)
+X.pred <- rbind(x.1, x.2, x.3)
+pred=data.frame(X.pred)
 colnames(pred)=c("Z", "W")
 
 copula.pred=data.frame(pnorm(pred$W), pnorm(pred$Z))
 colnames(copula.pred)=c("V", "U")
 
-##########################################################################
+```
+
+## Plots of the Copula
+
+```{r}
 ggplot(copula) +
   geom_point(aes(x=V,y=U, color='blue'))+
   geom_point(data=copula.pred,aes(x=V,y=U, color = 'red')) +
   scale_color_discrete(name='', labels=c('Pred','Raw data'))
 
-par(mfrow=c(1,1))
-plot(data)
-par(new=TRUE)
-points(pred, col='green')
+```
 
-#Plot of raw data and sampling from predictive distribution
-ggplot(data) +
-  geom_point(aes(x=Z,y=W, color='blue'))+
-  geom_point(data=pred,aes(x=Z,y=W, color = 'red')) +
-  scale_color_discrete(name='', labels=c('Pred','Raw'))
+
 
