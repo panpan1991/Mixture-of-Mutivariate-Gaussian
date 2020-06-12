@@ -1,0 +1,77 @@
+---
+title: "Summary of Mohamad Khaled"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library("ggplot2")
+library("mixtools")
+library("mvtnorm")
+```
+
+## T-copula with df=2
+
+```{r}
+sigma=matrix(c(1, 0.75, 0.75, 1), ncol=2)
+dataT=rmvt(1000, sigma, df=2)
+
+copulaT=data.frame(pt(dataT, df=2))
+colnames(copulaT)=c('U', 'V')
+
+dataT=data.frame(dataT)
+ggplot(dataT)+
+  geom_point(aes(x=X1, y=X2),color='blue')+
+  ggtitle("A Sample from T Distribution with df=2")
+
+ggplot(copulaT)+
+  geom_point(aes(x=U, y=V),color='blue')+
+  ggtitle("A Sample from T copula with df=2")
+
+
+```
+
+
+## EM algorithm to estimate a mixture of multivariate normal distributions
+
+```{r}
+U=copulaT[,1]
+V=copulaT[,2]
+Z=qnorm(U);
+W=qnorm(V);
+dataZ=data.frame(Z, W)
+
+est=mvnormalmixEM(dataZ, lambda = NULL, mu = NULL, sigma = NULL, k = 3,
+              arbmean = TRUE, arbvar = TRUE, epsilon = 1e-08, 
+              maxit = 10000, verb = FALSE)
+
+
+```
+
+##Sampling from the posterior predictive distribution
+
+```{r}
+x.1<-rmvnorm(round(est$lambda[1],2)*1000, est$mu[[1]], est$sigma[[1]])
+x.2 <- rmvnorm(round(est$lambda[2],2)*1000, est$mu[[2]], est$sigma[[2]])
+x.3 <-rmvnorm(round(est$lambda[3],2)*1000, est$mu[[3]], est$sigma[[3]])
+
+X.pred <- rbind(x.1, x.2, x.3)
+pred=data.frame(X.pred)
+colnames(pred)=c("Z", "W")
+
+copula.pred=data.frame(pnorm(pred$W), pnorm(pred$Z))
+colnames(copula.pred)=c("V", "U")
+
+```
+
+## Plots of the Copula
+
+```{r}
+ggplot(copulaT) +
+  geom_point(aes(x=V,y=U, color='blue'))+
+  geom_point(data=copula.pred,aes(x=V,y=U, color = 'red')) +
+  scale_color_discrete(name='', labels=c('Pred','Raw data'))
+
+```
+
+
+
