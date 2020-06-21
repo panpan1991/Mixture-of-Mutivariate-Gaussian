@@ -1,28 +1,72 @@
 library("ggplot2")
 library("mixtools")
 library("mvtnorm")
-source(file="filename.r")
 
-#t-copula with df=2
-sigma=matrix(c(1, 0.75, 0.75, 1), ncol=2)
-data=rmvt(1000, sigma, df=2)
-copula=data.frame(pt(data, df=2))
-colnames(copula)=c('U', 'V')
+n=1500
+X=seq(0,5, length.out = n)
+X=cbind(rep(1, n), X)
+beta1=c(0.1, 0.3)
 
-ggplot(copula)+
-  geom_point(aes(x=U, y=V),color='blue')+
-  ggtitle("A Sample from T copula with df=2")
+pi=cbind(exp(X%*%beta1)/(exp(X%*%beta1)+1), 1/(exp(X%*%beta1)+1))
 
-data=qnorm(pt(data, df=2))
+h=t(apply(pi, 1,  rmultinom, n=1, size=1))
+
+Z1=matrix(rep(0, 2*n), nrow = n)
+
+lambda11=c(0.1,0.3)
+lambda12=c(0.1,0.4)
+sigma=0.5
+I=matrix(c(1,0,0,1), nrow = 2)
+mu1=cbind((X%*%lambda11)[,1], (X%*%lambda12)[,1])
+
+for (i in 1:n) {
+  Z1[i, ]=rmvnorm(1,mu1[i,], sigma*I)
+}
+
+
+Z2=matrix(rep(0, 2*n), nrow = n)
+
+lambda21=c(0.3, 0.1)
+lambda22=c(0.4, 0.1)
+sigma2=1
+I=matrix(c(1,0,0,1), nrow = 2)
+mu2=cbind((X%*%lambda21)[,1], (X%*%lambda22)[,1])
+
+for (i in 1:n) {
+  Z2[i, ]=rmvnorm(1,mu2[i,], sigma2*I)
+}
+Z=matrix(rep(0, 2*n), nrow = n)
+for (i in 1:n) {
+Z[i,]=Z1[i,]*h[i,1]+Z2[i,]*h[i,2]
+}
+
+u=t(apply(Z, 1, pnorm))
+U=u[,1]
+V=u[,2]
+
+par(mfrow=c(1,3))
+plot(U[1:(1/3*n)], V[1:(1/3*n)], xlab = 'U', ylab='V', main = '0<z<-1.5')
+plot(U[(1/3*n):(2/3*n)], V[(1/3*n):(2/3*n)],xlab = 'U', ylab='V', main = '1.5<z<3')
+plot(U[(2/3*n):n], V[(2/3*n):n], xlab = 'U', ylab='V', main = '3<z<5')
+
+
+
+X1=sapply(V, F_inv, w=pi, u=mu, s=sigmar)
+X2=sapply(U, F_inv, w=pi, u=mu, s=sigmar)
+
+par(mfrow=c(1,3))
+plot(X1[1:(1/3*n)], X2[1:(1/3*n)],  xlab = 'X', ylab='Y', main = '0<z<-1.5')
+plot(X1[(1/3*n):(2/3*n)], X2[(1/3*n):(2/3*n)], xlab = 'X', ylab='Y', main = '1.5<z<3')
+plot(X1[(2/3*n):n], X2[(2/3*n):n], xlab = 'X', ylab='Y', main = '3<z<5')
+
 
 ######################################################
+set.seed(100)
 R=6
 mu=c(-9, -5.4, -1.8, 1.8, 5.4, 9)
 sigmar=rep(1/sqrt(10), R)
 pi=rep(1/R, R)
-alpha=3/4
-beta=1/2
-theta=20
+theta=40
 
 # evaluate the function at the point x, where the components 
 # of the mixture have weights w, means stored in u, and std deviations
@@ -36,37 +80,55 @@ F_inv = function(p,w,u,s,br=c(-1000,1000))
   return( uniroot(G,br)$root ) 
 }
 
-#test the inverse function above
-X = c(rnorm(1000,mean=-9,sd=1/sqrt(10)),
-      rnorm(1000,mean=-5.4,sd=1/sqrt(10)),
-      rnorm(1000,mean=-1.8,sd=1/sqrt(10)),
-      rnorm(1000,mean=1.8,sd=1/sqrt(10)),
-      rnorm(1000,mean=5.4,sd=1/sqrt(10)),
-      rnorm(1000,mean=9,sd=1/sqrt(10)))
 
-#Sample quantile
-quantile(X,.95)
+l=5
+#function alpha(x)
+a<-function(x){
+  2/3-1/4*(exp(l*x)/(exp(l*x)+1))
+}
+#function beta(x)
+b<-function(x){
+  1/2+1/4*(exp(l*x)/(exp(l*x)+1))
+}
 
-#Quantile from F_inv
-F_inv(.95,pi ,mu, sigmar)
+n=1500
+V=runif(n)
+W=runif(n)
 
-V=runif(1000)
-W=runif(1000)
+X=seq(-4,4, length.out = n)
 
 C <- function(u) {
   (1-beta)*u^(1-alpha)*v^(-beta)*(u^(-theta*alpha)+v^(-theta*beta)-1)^(-1/theta)+
     beta*u^(1-alpha)*v^(-beta*(1+theta))*(u^(-theta*alpha)+v^(-theta*beta)-1)^(-1/theta-1)-w
 }
 
-U=rep(0,1000)
-for (i in 1:1000) {
+U=rep(0,n)
+for (i in 1:n) {
   v=V[i]
   w=W[i]
+  alpha=a(X[i])
+  beta=b(X[i])
   U[i]=uniroot(C, lower = 0, upper = 1)$root
 }
 
+par(mfrow=c(1,3))
+plot(U[1:(1/3*n)], V[1:(1/3*n)], xlab = 'U', ylab='V', main = '-4<z<-1.3')
+plot(U[(1/3*n):(2/3*n)], V[(1/3*n):(2/3*n)],xlab = 'U', ylab='V', main = '-1.3<z<1.3')
+plot(U[(2/3*n):n], V[(2/3*n):n], xlab = 'U', ylab='V', main = '1.3<z<4')
+
+
+
 X1=sapply(V, F_inv, w=pi, u=mu, s=sigmar)
 X2=sapply(U, F_inv, w=pi, u=mu, s=sigmar)
+
+par(mfrow=c(1,3))
+plot(X1[1:(1/3*n)], X2[1:(1/3*n)],  xlab = 'X', ylab='Y', main ='-4<z<-1.3')
+plot(X1[(1/3*n):(2/3*n)], X2[(1/3*n):(2/3*n)], xlab = 'X', ylab='Y', main =  '-1.3<z<1.3')
+plot(X1[(2/3*n):n], X2[(2/3*n):n], xlab = 'X', ylab='Y', main = '1.3<z<4')
+
+
+
+
 
 
 copula=data.frame(V, U)
@@ -77,6 +139,9 @@ W=qnorm(V);
 data=data.frame(Z, W)
 # plot(Z,W)
 # write.csv(data, "ZW.csv", row.names = FALSE)
+
+
+
 
 
 
@@ -115,4 +180,11 @@ ggplot(data) +
   geom_point(aes(x=Z,y=W, color='blue'))+
   geom_point(data=pred,aes(x=Z,y=W, color = 'red')) +
   scale_color_discrete(name='', labels=c('Pred','Raw'))
+
+
+####################################
+
+Z=rmvnorm(500, c(0,0), matrix(c(1, 0, 0, 1), nrow = 2))
+plot(Z[, 1], Z[, 2])
+plot(pnorm(Z[, 1]), pnorm(Z[, 2]))
 

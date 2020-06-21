@@ -7,6 +7,7 @@ output: pdf_document
 library("ggplot2")
 library("mixtools")
 library("mvtnorm")
+library("reshape")
 ```
 
 ## T-copula with df=2
@@ -59,17 +60,25 @@ pred=data.frame(X.pred)
 colnames(pred)=c("Z", "W")
 
 copula.pred=data.frame(pnorm(pred$W), pnorm(pred$Z))
-colnames(copula.pred)=c("V", "U")
+colnames(copula.pred)=c("U", "V")
 
 ```
 
 ## Plots of the Copula
 
 ```{r}
-ggplot(copulaT) +
-  geom_point(aes(x=V,y=U, color='blue'))+
-  geom_point(data=copula.pred,aes(x=V,y=U, color = 'red')) +
-  scale_color_discrete(name='', labels=c('Pred','Raw data'))
+source1=rep(1, length(copulaT[,2]))
+source2=rep(0, length(copula.pred[,2]))
+ggdata1=data.frame(copulaT, source1)
+ggdata2=data.frame(copula.pred, source2)
+colnames(ggdata1)=c("U", "V", "source")
+colnames(ggdata2)=c("U", "V", "source")
+ggdata=rbind(ggdata1, ggdata2)
+
+ggplot(data=ggdata) +
+  geom_point(aes(x=V,y=U, color=factor(source)))+
+  scale_color_discrete(name='Data source', labels=c('Pred','Raw data'))
+
 
 ```
 
