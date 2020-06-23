@@ -2,44 +2,52 @@ library("ggplot2")
 library("mixtools")
 library("mvtnorm")
 
-n=1500
+set.seed(100)
+
+n=1000
 X=seq(0,5, length.out = n)
 X=cbind(rep(1, n), X)
-beta1=c(0.1, 0.3)
+delta=c(0.1, 0.3)
 
-pi=cbind(exp(X%*%beta1)/(exp(X%*%beta1)+1), 1/(exp(X%*%beta1)+1))
-
+pi=cbind(exp(X%*%delta)/(exp(X%*%delta)+1), 1/(exp(X%*%delta)+1))
+#Generate "latent" variable indicating which component
 h=t(apply(pi, 1,  rmultinom, n=1, size=1))
 
-Z1=matrix(rep(0, 2*n), nrow = n)
 
-lambda11=c(0.1,0.3)
-lambda12=c(0.1,0.4)
-sigma=0.5
+#The first bivariate normal component
+beta11=c(0.1,0.3)
+beta12=c(0.1,0.4)
+sigma1=0.5
 I=matrix(c(1,0,0,1), nrow = 2)
-mu1=cbind((X%*%lambda11)[,1], (X%*%lambda12)[,1])
+mu1=cbind((X%*%beta11)[,1], (X%*%beta12)[,1])
 
-for (i in 1:n) {
-  Z1[i, ]=rmvnorm(1,mu1[i,], sigma*I)
-}
+#Sample from the first component
+Z1=t(apply(mu1, 1, rmvnorm, n=1, sigma=sigma1*I))
 
 
-Z2=matrix(rep(0, 2*n), nrow = n)
 
-lambda21=c(0.3, 0.1)
-lambda22=c(0.4, 0.1)
+#The second bivariate normal component
+beta21=c(0.3, 0.1)
+beta22=c(0.4, 0.1)
 sigma2=1
 I=matrix(c(1,0,0,1), nrow = 2)
-mu2=cbind((X%*%lambda21)[,1], (X%*%lambda22)[,1])
+#mean vector
+mu2=cbind((X%*%beta21)[,1], (X%*%beta22)[,1])
+#sample from the second component
+Z2=t(apply(mu2, 1, rmvnorm, n=1, sigma=sigma2*I))
 
-for (i in 1:n) {
-  Z2[i, ]=rmvnorm(1,mu2[i,], sigma2*I)
-}
+#use h to select from Z1 and Z2
 Z=matrix(rep(0, 2*n), nrow = n)
 for (i in 1:n) {
 Z[i,]=Z1[i,]*h[i,1]+Z2[i,]*h[i,2]
 }
 
+plot(Z[,1], Z[,2])
+dat=data.frame(Z[,1], Z[,2], X[,2])
+colnames(dat)=c("Y1", "Y2", "X")
+write.table(dat, "dat")
+
+#Get copula data
 u=t(apply(Z, 1, pnorm))
 U=u[,1]
 V=u[,2]
@@ -50,18 +58,7 @@ plot(U[(1/3*n):(2/3*n)], V[(1/3*n):(2/3*n)],xlab = 'U', ylab='V', main = '1.5<z<
 plot(U[(2/3*n):n], V[(2/3*n):n], xlab = 'U', ylab='V', main = '3<z<5')
 
 
-
-X1=sapply(V, F_inv, w=pi, u=mu, s=sigmar)
-X2=sapply(U, F_inv, w=pi, u=mu, s=sigmar)
-
-par(mfrow=c(1,3))
-plot(X1[1:(1/3*n)], X2[1:(1/3*n)],  xlab = 'X', ylab='Y', main = '0<z<-1.5')
-plot(X1[(1/3*n):(2/3*n)], X2[(1/3*n):(2/3*n)], xlab = 'X', ylab='Y', main = '1.5<z<3')
-plot(X1[(2/3*n):n], X2[(2/3*n):n], xlab = 'X', ylab='Y', main = '3<z<5')
-
-
-######################################################
-set.seed(100)
+#Set up marginal distribution
 R=6
 mu=c(-9, -5.4, -1.8, 1.8, 5.4, 9)
 sigmar=rep(1/sqrt(10), R)
@@ -73,6 +70,7 @@ theta=40
 # stored in s - all must have the same length.
 F = function(x,w,u,s) sum( w*pnorm(x,mean=u,sd=s) )
 
+#Marginal quantile function
 # provide an initial bracket for the quantile. default is c(-1000,1000). 
 F_inv = function(p,w,u,s,br=c(-1000,1000))
 {
@@ -80,6 +78,18 @@ F_inv = function(p,w,u,s,br=c(-1000,1000))
   return( uniroot(G,br)$root ) 
 }
 
+
+#Get the orginal data
+X1=sapply(V, F_inv, w=pi, u=mu, s=sigmar)
+X2=sapply(U, F_inv, w=pi, u=mu, s=sigmar)
+
+par(mfrow=c(1,3))
+plot(X1[1:(1/3*n)], X2[1:(1/3*n)],  xlab = 'X', ylab='Y', main = '0<z<-1.5')
+plot(X1[(1/3*n):(2/3*n)], X2[(1/3*n):(2/3*n)], xlab = 'X', ylab='Y', main = '1.5<z<3')
+plot(X1[(2/3*n):n], X2[(2/3*n):n], xlab = 'X', ylab='Y', main = '3<z<5')
+
+
+######################################################
 
 l=5
 #function alpha(x)
@@ -127,10 +137,6 @@ plot(X1[(1/3*n):(2/3*n)], X2[(1/3*n):(2/3*n)], xlab = 'X', ylab='Y', main =  '-1
 plot(X1[(2/3*n):n], X2[(2/3*n):n], xlab = 'X', ylab='Y', main = '1.3<z<4')
 
 
-
-
-
-
 copula=data.frame(V, U)
 # write.csv(data, "UV.csv", row.names = FALSE)
 
@@ -139,9 +145,6 @@ W=qnorm(V);
 data=data.frame(Z, W)
 # plot(Z,W)
 # write.csv(data, "ZW.csv", row.names = FALSE)
-
-
-
 
 
 
