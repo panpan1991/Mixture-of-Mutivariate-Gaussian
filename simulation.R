@@ -3,7 +3,6 @@ library("mixtools")
 library("mvtnorm")
 
 set.seed(100)
-
 n=1000
 X=seq(0,5, length.out = n)
 X=cbind(rep(1, n), X)
