@@ -14,7 +14,7 @@ X=matrix(c(rep(1,n),X), ncol = 2)
 
 
 
-k=10 #number of components in the mixture of regression
+k=2 #number of components in the mixture of regression
   
 #Hyperparameter for sigma's square's prior
 alpha=1
@@ -258,7 +258,7 @@ legend(0.8, 3, legend=c("fitted", "h3"),
 sigma.sq.record[1000,]
 individual.mu=X%*%beta.record[[1000]]
 individual.sigma=matrix(rep(sigma.sq.record[1000,], 1500), byrow = TRUE, nrow = 1500)
-individual.pred=apply(individual.mu, 1, rnorm, n=10,sd=sigma.sq.record[1000,])
+individual.pred=apply(individual.mu, 1, rnorm, n=k,sd=sigma.sq.record[1000,])
 
 h=t(apply(p.record[[1000]], 1,  rmultinom, n=1, size=1))
 
@@ -271,7 +271,7 @@ points(X[,2],Y1.pred, col='green')
 sigma2.sq.record[1000,]
 individual.mu2=X%*%beta2.record[[1000]]
 individual.sigma2=matrix(rep(sigma2.sq.record[1000,], 1500), byrow = TRUE, nrow = 1500)
-individual.pred2=apply(individual.mu2, 1, rnorm, n=10,sd=sigma2.sq.record[1000,])
+individual.pred2=apply(individual.mu2, 1, rnorm, n=k,sd=sigma2.sq.record[1000,])
 
 #h=t(apply(p.record[[1000]], 1,  rmultinom, n=1, size=1))
 
@@ -283,8 +283,8 @@ points(X[,2],Y2.pred, col='green')
 
 Z.pred=cbind(Y1.pred, Y2.pred)
 u.pred=t(apply(Z, 1, pnorm))
-U.pred=u[,1]
-V.pred=u[,2]
+U.pred=u.pred[,1]
+V.pred=u.pred[,2]
 
 par(mfrow=c(1,3))
 plot(U[1:(1/3*n)], V[1:(1/3*n)], xlab = 'U', ylab='V', main = '0<z<-1.5')
