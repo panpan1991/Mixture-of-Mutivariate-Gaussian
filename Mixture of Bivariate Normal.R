@@ -1,9 +1,11 @@
+#MCMC for Mixture of Experts for Bivariate Normals with Diagonal Correlation Matrix
 library(pscl)
 library(MASS)
 library(pgdraw)
 library(matrixcalc)
 library(ggcorrplot)
-#load dataset
+library(rmutil)
+
 #dat=read.table("data4hw6")
 dat=read.table("dat")
 attach(dat)
@@ -14,7 +16,7 @@ X=matrix(c(rep(1,n),X), ncol = 2)
 
 
 
-k=2 #number of components in the mixture of regression
+k=3 #number of components in the mixture of regression
   
 #Hyperparameter for sigma's square's prior
 alpha=1
@@ -62,7 +64,6 @@ Xk.record=list()
 # i=1
 for(i in 1:n.iteration){
 
-#???
 individual.density=dnorm(dat$Y1,mean=X%*%beta,
                          sd=matrix(rep(sqrt(sigma.sq),n), byrow = TRUE, ncol = k))
 
@@ -140,8 +141,8 @@ p=exp(X%*%delta)/apply(exp(X%*%delta), 1, sum)
 
 sigma.sq.record[i,]=sigma.sq
 beta.record[[i]]=beta
-sigma2.sq.record[i,]=sigma.sq
-beta2.record[[i]]=beta
+sigma2.sq.record[i,]=sigma2.sq
+beta2.record[[i]]=beta2
 delta.record[[i]]=delta
 
 print( i)
@@ -149,113 +150,132 @@ print( i)
 }
 
 
-#Trace plots
-par(mfrow=c(3,2))
-beta1.record=matrix(rep(0,2*n.iteration), nrow = n.iteration)
-for (i in 1:n.iteration) {
-  beta1.record[i,]=beta.record[[i]][,1]
-}
 
-beta2.record=matrix(rep(0,2*n.iteration), nrow = n.iteration)
-for (i in 1:n.iteration) {
-  beta2.record[i,]=beta.record[[i]][,2]
-}
+ 
+ 
+# surface plot
 
-beta3.record=matrix(rep(0,2*n.iteration), nrow = n.iteration)
-for (i in 1:n.iteration) {
-  beta3.record[i,]=beta.record[[i]][,3]
-}
-
-
-plot(beta1.record[,2], main="Beta1 slope")
-plot(beta1.record[,1], main="Beta1 intercept")
-
-plot(beta2.record[,2], main="Beta2 slope")
-plot(beta2.record[,1], main="Beta2 intercept")
-
-plot(beta3.record[,2], main="Beta2 slope")
-plot(beta3.record[,1], main="Beta2 intercept")
-
-delta1.record=matrix(rep(0,2*n.iteration), nrow = n.iteration)
-for (i in 1:n.iteration) {
-  delta1.record[i,]=delta.record[[i]][,1]
-}
-
-plot(delta1.record[,2], main="delta1 slope")
-plot(delta1.record[,1], main="delta1 intercept")
-
-delta1.record=matrix(rep(0,2*n.iteration), nrow = n.iteration)
-for (i in 1:n.iteration) {
-  delta1.record[i,]=delta.record[[i]][,1]
-}
-
-
-par(mfrow=c(1,3))
-plot(sigma.sq.record[,1], main="Sigma 1")
-plot(sigma.sq.record[,2], main="Sigma 2")
-plot(sigma.sq.record[,3], main="Sigma 2")
-
-par(mfrow=c(2,1))
-
-#Fitted Curve
+beta.record[[1]]
+beta2.record[[1]]
+delta.record[[1]]
 p.record=list()
 for (i in 1:n.iteration) {
   p.record[[i]]=exp(X%*%delta.record[[i]])/apply(exp(X%*%delta.record[[i]]), 1, sum)
 }
-fitted=list()
+p.record[[1]] 
+
+X.pred=c(1, 2)
+
+p=function(x, i){
+  exp(x%*%delta.record[[i]])/sum(exp(x%*%delta.record[[i]]))
+}
+
+mu=function(x, i){
+ rbind(x%*%beta.record[[i]],
+  x%*%beta2.record[[i]])
+}
+
+sig=function(i){
+  rbind(sigma.sq.record[i,],
+        sigma2.sq.record[i,])
+}
+
+p(X.pred, 1)
+mu(X.pred, 1)
+sig(1)
+
+x=X.pred
+copula.mix=function(u, v){
+  y=c(qnorm(u), qnorm(v))
+  summm=0
+  for (i in 500:n.iteration) {
+    summ=0
+    for (j in 1:k) {
+      summ=summ+p(x, i)[j]*dmvnorm(y, mean=mu(x,i)[, j], sigma=diag(sig(i)[,j]))
+    }
+    summm=summm+summ
+  }
+  summm=summm
+  return(summm/(n.iteration+1-500)/(dnorm(qnorm(u))*dnorm(qnorm(v))))
+  
+}
+
+Copula.mix=function(u, v){
+  y=c(qnorm(u), qnorm(v))
+  summm=0
+  for (i in 500:n.iteration) {
+    summ=0
+    for (j in 1:k) {
+      summ=summ+p(x, i)[j]*pmvnorm(lower=-Inf, upper=c(y[1],y[2]), mean=mu(x,i)[, j], sigma=diag(sig(i)[,j]))[1]
+    }
+    summm=summm+summ
+  }
+  summm=summm
+  return(summm/(n.iteration+1-500))
+}
+
+copula.mix(0.1,0.2)
+Copula.mix(0.1,0.2)
+
+f <- function(x,y) {
+  copula.mix(x,y)*Copula.mix(x,y)
+}
+int2(f, a=c(0,0), b=c(1,1))
+
+#Fitted Curve
+n.burnin=1000
+p.record=list()
 for (i in 1:n.iteration) {
+  p.record[[i]]=exp(X%*%delta.record[[i]])/apply(exp(X%*%delta.record[[i]]), 1, sum)
+}
+
+p.record[[2000]]
+
+summ=rep(0,n)
+sum(p.record)
+
+for (i in n.burnin=1000:n.iteration) {
+  summ=summ+p.record[[i]]
+}
+
+fitted=list()
+for (i in 500:n.iteration) {
   fitted[[i]]=apply(p.record[[i]]*(X%*%beta.record[[i]]), 1,sum)
 }
 
-
 summ=rep(0,n)
 for (i in 500:n.iteration) {
   summ=summ+fitted[[i]]
 }
 
-fit=summ/(n.iteration-500)
+Y1.fit=summ/(n.iteration-499)
 
 plot(X[,2],Y1, xlab="X", ylab = "Y1", main = "Sample points and fitted line")
-lines(X[,2], fit, col="red", type = "l",lwd=3)
-#lines(X[,2],h3(X[,2]), col="green", type = 'l', lwd=3)
-
-# Add a legend
-legend(0.8, 3, legend=c("fitted", "h3"),
-       col=c("red", "green"), lty=1:1, lwd=3:3, cex=1.5)
+lines(X[,2], Y1.fit, col="red", type = "l",lwd=3)
 
 
 #######################
-
 #Fitted Curve
-p.record=list()
-for (i in 1:n.iteration) {
-  p.record[[i]]=exp(X%*%delta.record[[i]])/apply(exp(X%*%delta.record[[i]]), 1, sum)
-}
+
 fitted=list()
-for (i in 1:n.iteration) {
+for (i in (n.burnin+1):n.iteration) {
   fitted[[i]]=apply(p.record[[i]]*(X%*%beta2.record[[i]]), 1,sum)
 }
 
-
 summ=rep(0,n)
-for (i in 500:n.iteration) {
+for (i in (n.burnin+1):n.iteration) {
   summ=summ+fitted[[i]]
 }
 
-fit=summ/(n.iteration-500)
+Y2.fit=summ/(n.iteration-n.burnin)
 
 plot(X[,2],Y2, xlab="X", ylab = "Y2", main = "Sample points and fitted line")
-lines(X[,2], fit, col="red", type = "l",lwd=3)
-#lines(X[,2],h3(X[,2]), col="green", type = 'l', lwd=3)
-
-# Add a legend
-legend(0.8, 3, legend=c("fitted", "h3"),
-       col=c("red", "green"), lty=1:1, lwd=3:3, cex=1.5)
+lines(X[,2], Y2.fit, col="red", type = "l",lwd=3)
 
 
 
 
-sigma.sq.record[1000,]
+
 individual.mu=X%*%beta.record[[1000]]
 individual.sigma=matrix(rep(sigma.sq.record[1000,], 1500), byrow = TRUE, nrow = 1500)
 individual.pred=apply(individual.mu, 1, rnorm, n=k,sd=sigma.sq.record[1000,])
@@ -268,7 +288,6 @@ plot(X[,2],Y1)
 par(new=TRUE)
 points(X[,2],Y1.pred, col='green')
 ###################################
-sigma2.sq.record[1000,]
 individual.mu2=X%*%beta2.record[[1000]]
 individual.sigma2=matrix(rep(sigma2.sq.record[1000,], 1500), byrow = TRUE, nrow = 1500)
 individual.pred2=apply(individual.mu2, 1, rnorm, n=k,sd=sigma2.sq.record[1000,])
@@ -282,23 +301,28 @@ par(new=TRUE)
 points(X[,2],Y2.pred, col='green')
 
 Z.pred=cbind(Y1.pred, Y2.pred)
-u.pred=t(apply(Z, 1, pnorm))
+#Z.pred=cbind(Y1.fit, Y2.fit)
+u.pred=t(apply(Z.pred, 1, pnorm))
 U.pred=u.pred[,1]
 V.pred=u.pred[,2]
 
+U=pnorm(Y1)
+V=pnorm(Y2)
+
 par(mfrow=c(1,3))
-plot(U[1:(1/3*n)], V[1:(1/3*n)], xlab = 'U', ylab='V', main = '0<z<-1.5')
+plot(U[1:(1/3*n)], V[1:(1/3*n)], xlab = 'U1', ylab='U2', main = '2<x<-3')
 points(U.pred[1:(1/3*n)], V.pred[1:(1/3*n)], col='red')
-plot(U[(1/3*n):(2/3*n)], V[(1/3*n):(2/3*n)],xlab = 'U', ylab='V', main = '1.5<z<3')
+plot(U[(1/3*n):(2/3*n)], V[(1/3*n):(2/3*n)],xlab = 'U1', ylab='U2', main = '3<x<4')
 points(U.pred[(1/3*n):(2/3*n)], V.pred[(1/3*n):(2/3*n)], col='red')
-plot(U[(2/3*n):n], V[(2/3*n):n], xlab = 'U', ylab='V', main = '3<z<5')
+plot(U[(2/3*n):n], V[(2/3*n):n], xlab = 'U1', ylab='U2', main = '4<x<5')
 points(U.pred[(2/3*n):n], V.pred[(2/3*n):n], col='red')
 
 
 
 
 
-
+plot(U, V, xlab = 'U', ylab='V')
+points(U.pred, V.pred, col='red')
 
 
 

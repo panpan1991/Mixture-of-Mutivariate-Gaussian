@@ -1,6 +1,8 @@
 ---
 title: "Summary of Mohamad Khaled"
-output: pdf_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
@@ -8,6 +10,7 @@ library("ggplot2")
 library("mixtools")
 library("mvtnorm")
 library("reshape")
+library("plotly")
 ```
 
 ## The Copula Example in Mohamad Khaled 2018
@@ -83,6 +86,51 @@ est=mvnormalmixEM(dataZ, lambda = NULL, mu = NULL, sigma = NULL, k = 3,
 
 ```
 
+## Surface plot of the estimated copula
+
+```{r}
+c.real=function(u,v){
+  (1-beta)*(1-alpha)*u^(-alpha)*v^(-beta)*(u^(-theta*alpha)+v^(-theta*beta)-1)^(-1/theta)+
+    (1-beta)*u^(1-alpha)*v^(-beta)*(-1/theta)*(u^(-theta*alpha)+v^(-theta*beta)-1)^(-1/theta-1)*
+    (-theta*alpha*u^(-theta*alpha-1))+
+    beta*(1-alpha)*u^(-alpha)*v^(-beta*(1+theta))*(u^(-theta*alpha)+v^(-theta*beta)-1)^(-1/theta-1)+
+    beta*u^(1-alpha)*v^(-beta*(1+theta))*(-1/theta-1)*(u^(-theta*alpha)+v^(-theta*beta)-1)^(-1/theta-2)*
+    (-theta*alpha*u^(-theta*alpha-1))
+}
+
+
+c.est=function(u1, v1){
+  (est$lambda[1]*dmvnorm(c(qnorm(u1), qnorm(v1)), mean=est$mu[[1]], sigma = est$sigma[[1]])+
+  est$lambda[2]*dmvnorm(c(qnorm(u1), qnorm(v1)), mean=est$mu[[2]], sigma = est$sigma[[2]])+
+  est$lambda[3]*dmvnorm(c(qnorm(u1), qnorm(v1)), mean=est$mu[[3]], sigma = est$sigma[[3]]))/
+    (dnorm(qnorm(u1))*dnorm(qnorm(v1)))
+}
+
+n=100
+u=seq(0.01, 0.99, length.out = n)
+v=seq(0.01,0.99, length.out = n)
+z.est=matrix(rep(0, n*n), nrow=n)
+z=matrix(rep(0, n*n), nrow=n)
+
+for (i in 1:n) {
+  for (j in 1:n) {
+     z.est[i,j]=c.est(u[i], v[j])
+  }
+}
+
+
+for (i in 1:n) {
+  for (j in 1:n) {
+     z[i,j]=c.real(u[i], v[j])
+  }
+}
+
+plot_ly(z = z, type = "surface") 
+plot_ly(z = z.est, type = "surface") 
+```
+
+
+
 ##Sampling from the posterior predictive distribution
 
 ```{r}
@@ -97,16 +145,19 @@ colnames(pred)=c("Z", "W")
 copula.pred=data.frame(pnorm(pred$W), pnorm(pred$Z))
 colnames(copula.pred)=c("V", "U")
 
+
 ```
 
 ## Plots of the Copula
 
 ```{r}
-plotdata1=data.frame(copula, )
+
 ggplot(copula) +
   geom_point(aes(x=V,y=U, color='blue'))+
   geom_point(data=copula.pred,aes(x=V,y=U, color = 'red')) +
   scale_color_discrete(name='', labels=c('Pred','Raw data'))
+
+
 
 ```
 
